@@ -7,12 +7,16 @@ import { CorrelationCard } from "@/components/CorrelationCard";
 import { InvestmentAnalysis } from "@/components/InvestmentAnalysis";
 import { InvestmentBehaviorAnalysis } from "@/components/InvestmentBehaviorAnalysis";
 import { FileUpload } from "@/components/FileUpload";
+import { RiskMetricsCard } from "@/components/RiskMetricsCard";
 import {
   parseCSV,
+  parseCSVWithValidation,
   calculateCorrelations,
   calculateAnnualReturns,
   calculateOverallMetrics,
+  calculateRiskMetrics,
   PortfolioData,
+  RiskMetrics,
 } from "@/utils/portfolioAnalysis";
 
 const Index = () => {
@@ -74,6 +78,7 @@ const Index = () => {
   const metrics = calculateOverallMetrics(data);
   const correlations = calculateCorrelations(data);
   const annualReturns = calculateAnnualReturns(data);
+  const riskMetrics = calculateRiskMetrics(data);
 
   if (!metrics) return null;
 
@@ -116,8 +121,9 @@ const Index = () => {
 
         <PerformanceChart data={data} />
 
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           <CorrelationCard correlations={correlations} />
+          <RiskMetricsCard riskMetrics={riskMetrics} />
           <InvestmentAnalysis
             annualizedReturn={metrics.annualizedReturn}
             totalReturn={metrics.totalReturn}

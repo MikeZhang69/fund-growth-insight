@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { Upload, Download, FileText } from "lucide-react";
+import { Upload, Download, FileText, AlertCircle, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
+import { parseCSVWithValidation } from "@/utils/portfolioAnalysis";
 
 interface FileUploadProps {
   onFileLoad: (csvText: string) => void;
@@ -16,11 +17,33 @@ export function FileUpload({ onFileLoad }: FileUploadProps) {
     const reader = new FileReader();
     reader.onload = (e) => {
       const text = e.target?.result as string;
+      
+      // Validate the CSV before processing
+      const validation = parseCSVWithValidation(text);
+      
+      if (validation.errors.length > 0) {
+        toast({
+          title: "File validation failed",
+          description: `Found ${validation.errors.length} error(s): ${validation.errors[0]}`,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Show warnings if any
+      if (validation.warnings.length > 0) {
+        toast({
+          title: "File loaded with warnings",
+          description: `${validation.warnings.length} warning(s) found. Data processed successfully.`,
+        });
+      } else {
+        toast({
+          title: "File uploaded successfully",
+          description: `${file.name} has been loaded and analyzed. ${validation.data.length} records processed.`,
+        });
+      }
+
       onFileLoad(text);
-      toast({
-        title: "File uploaded successfully",
-        description: `${file.name} has been loaded and analyzed.`,
-      });
     };
     reader.onerror = () => {
       toast({
