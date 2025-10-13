@@ -33,6 +33,36 @@ export interface RiskMetrics {
   sortinioRatio: number;
 }
 
+export interface BenchmarkComparison {
+  benchmark: string;
+  portfolioReturn: number;
+  benchmarkReturn: number;
+  alpha: number;
+  beta: number;
+  trackingError: number;
+  informationRatio: number;
+  activeReturn: number;
+}
+
+export interface DrawdownPeriod {
+  startDate: string;
+  endDate: string;
+  recoveryDate?: string;
+  peakValue: number;
+  troughValue: number;
+  drawdownPercent: number;
+  durationDays: number;
+  recoveryDays?: number;
+}
+
+export interface DrawdownAnalysis {
+  maxDrawdown: DrawdownPeriod;
+  allDrawdowns: DrawdownPeriod[];
+  averageDrawdown: number;
+  averageRecoveryTime: number;
+  currentDrawdown?: DrawdownPeriod;
+}
+
 export interface ParseResult {
   data: PortfolioData[];
   errors: string[];
@@ -205,7 +235,7 @@ export function parseCSVWithValidation(csvText: string): ParseResult {
   return { data, errors, warnings };
 }
 
-export function parsePortfolioData(data: any[]): PortfolioData[] {
+export function parsePortfolioData(data: unknown[]): PortfolioData[] {
   return data.slice(1).map(row => ({
     date: row[0],
     shareValue: parseFloat(row[1]) || 0,
@@ -358,5 +388,243 @@ export function calculateRiskMetrics(data: PortfolioData[], riskFreeRate: number
     volatility: Number(volatility.toFixed(2)),
     downsideDeviation: Number(downsideDeviation.toFixed(2)),
     sortinioRatio: Number(sortinioRatio.toFixed(3)),
+  };
+}
+
+export function calculateBenchmarkComparisons(data: PortfolioData[]): BenchmarkComparison[] {
+  if (data.length < 2) return [];
+
+  const benchmarks = [
+    { name: 'SHA', values: data.map(d => d.sha) },
+    { name: 'SHE', values: data.map(d => d.she) },
+    { name: 'CSI300', values: data.map(d => d.csi300) },
+  ];
+
+  const portfolioValues = data.map(d => d.shareValue);
+  
+  return benchmarks.map(benchmark => {
+    // Calculate returns
+    const portfolioReturns = calculateReturns(portfolioValues);
+    const benchmarkReturns = calculateReturns(benchmark.values);
+    
+    // Calculate total returns
+    const portfolioTotalReturn = ((portfolioValues[portfolioValues.length - 1] - portfolioValues[0]) / portfolioValues[0]) * 100;
+    const benchmarkTotalReturn = ((benchmark.values[benchmark.values.length - 1] - benchmark.values[0]) / benchmark.values[0]) * 100;
+    
+    // Calculate beta
+    const beta = calculateBeta(portfolioReturns, benchmarkReturns);
+    
+    // Calculate alpha (portfolio return - (risk-free rate + beta * (benchmark return - risk-free rate)))
+    // Assuming risk-free rate of 3%
+    const riskFreeRate = 3;
+    const alpha = portfolioTotalReturn - (riskFreeRate + beta * (benchmarkTotalReturn - riskFreeRate));
+    
+    // Calculate tracking error
+    const trackingError = calculateTrackingError(portfolioReturns, benchmarkReturns);
+    
+    // Calculate active return
+    const activeReturn = portfolioTotalReturn - benchmarkTotalReturn;
+    
+    // Calculate information ratio
+    const informationRatio = trackingError !== 0 ? activeReturn / trackingError : 0;
+    
+    return {
+      benchmark: benchmark.name,
+      portfolioReturn: Number(portfolioTotalReturn.toFixed(2)),
+      benchmarkReturn: Number(benchmarkTotalReturn.toFixed(2)),
+      alpha: Number(alpha.toFixed(2)),
+      beta: Number(beta.toFixed(3)),
+      trackingError: Number(trackingError.toFixed(2)),
+      informationRatio: Number(informationRatio.toFixed(3)),
+      activeReturn: Number(activeReturn.toFixed(2)),
+    };
+  });
+}
+
+function calculateReturns(values: number[]): number[] {
+  const returns: number[] = [];
+  for (let i = 1; i < values.length; i++) {
+    if (values[i - 1] !== 0) {
+      returns.push((values[i] - values[i - 1]) / values[i - 1]);
+    }
+  }
+  return returns;
+}
+
+function calculateBeta(portfolioReturns: number[], benchmarkReturns: number[]): number {
+  const minLength = Math.min(portfolioReturns.length, benchmarkReturns.length);
+  if (minLength === 0) return 0;
+  
+  const portfolioMean = portfolioReturns.slice(0, minLength).reduce((a, b) => a + b, 0) / minLength;
+  const benchmarkMean = benchmarkReturns.slice(0, minLength).reduce((a, b) => a + b, 0) / minLength;
+  
+  let covariance = 0;
+  let benchmarkVariance = 0;
+  
+  for (let i = 0; i < minLength; i++) {
+    const portfolioDiff = portfolioReturns[i] - portfolioMean;
+    const benchmarkDiff = benchmarkReturns[i] - benchmarkMean;
+    covariance += portfolioDiff * benchmarkDiff;
+    benchmarkVariance += benchmarkDiff * benchmarkDiff;
+  }
+  
+  return benchmarkVariance !== 0 ? covariance / benchmarkVariance : 0;
+}
+
+function calculateTrackingError(portfolioReturns: number[], benchmarkReturns: number[]): number {
+  const minLength = Math.min(portfolioReturns.length, benchmarkReturns.length);
+  if (minLength === 0) return 0;
+  
+  const excessReturns: number[] = [];
+  for (let i = 0; i < minLength; i++) {
+    excessReturns.push(portfolioReturns[i] - benchmarkReturns[i]);
+  }
+  
+  const mean = excessReturns.reduce((a, b) => a + b, 0) / excessReturns.length;
+  const variance = excessReturns.reduce((sum, ret) => sum + Math.pow(ret - mean, 2), 0) / excessReturns.length;
+  
+  return Math.sqrt(variance * 252) * 100; // Annualized tracking error as percentage
+}
+
+export function calculateDrawdownAnalysis(data: PortfolioData[]): DrawdownAnalysis {
+  if (data.length < 2) {
+    return {
+      maxDrawdown: {
+        startDate: '',
+        endDate: '',
+        peakValue: 0,
+        troughValue: 0,
+        drawdownPercent: 0,
+        durationDays: 0,
+      },
+      allDrawdowns: [],
+      averageDrawdown: 0,
+      averageRecoveryTime: 0,
+    };
+  }
+
+  const drawdowns: DrawdownPeriod[] = [];
+  let currentPeak = data[0].shareValue;
+  let currentPeakDate = data[0].date;
+  let inDrawdown = false;
+  let drawdownStart = '';
+  let maxDrawdownPercent = 0;
+  let maxDrawdownIndex = 0;
+
+  for (let i = 1; i < data.length; i++) {
+    const currentValue = data[i].shareValue;
+    const currentDate = data[i].date;
+
+    if (currentValue > currentPeak) {
+      // New peak - end current drawdown if in one
+      if (inDrawdown) {
+        const drawdownPeriod = createDrawdownPeriod(
+          drawdownStart,
+          data[maxDrawdownIndex].date,
+          currentDate,
+          currentPeak,
+          data[maxDrawdownIndex].shareValue,
+          maxDrawdownPercent
+        );
+        drawdowns.push(drawdownPeriod);
+        inDrawdown = false;
+      }
+      
+      currentPeak = currentValue;
+      currentPeakDate = currentDate;
+      maxDrawdownPercent = 0;
+    } else {
+      // Potential drawdown
+      const drawdownPercent = ((currentPeak - currentValue) / currentPeak) * 100;
+      
+      if (drawdownPercent > 0.1) { // Only consider drawdowns > 0.1%
+        if (!inDrawdown) {
+          inDrawdown = true;
+          drawdownStart = currentPeakDate;
+          maxDrawdownPercent = drawdownPercent;
+          maxDrawdownIndex = i;
+        } else if (drawdownPercent > maxDrawdownPercent) {
+          maxDrawdownPercent = drawdownPercent;
+          maxDrawdownIndex = i;
+        }
+      }
+    }
+  }
+
+  // Handle ongoing drawdown
+  let currentDrawdown: DrawdownPeriod | undefined;
+  if (inDrawdown) {
+    currentDrawdown = createDrawdownPeriod(
+      drawdownStart,
+      data[maxDrawdownIndex].date,
+      undefined,
+      currentPeak,
+      data[maxDrawdownIndex].shareValue,
+      maxDrawdownPercent
+    );
+    drawdowns.push(currentDrawdown);
+  }
+
+  // Find maximum drawdown
+  let maxDrawdown = drawdowns[0] || {
+    startDate: '',
+    endDate: '',
+    peakValue: 0,
+    troughValue: 0,
+    drawdownPercent: 0,
+    durationDays: 0,
+  };
+
+  drawdowns.forEach(dd => {
+    if (dd.drawdownPercent > maxDrawdown.drawdownPercent) {
+      maxDrawdown = dd;
+    }
+  });
+
+  // Calculate averages
+  const completedDrawdowns = drawdowns.filter(dd => dd.recoveryDate);
+  const averageDrawdown = drawdowns.length > 0 
+    ? drawdowns.reduce((sum, dd) => sum + dd.drawdownPercent, 0) / drawdowns.length 
+    : 0;
+  const averageRecoveryTime = completedDrawdowns.length > 0 
+    ? completedDrawdowns.reduce((sum, dd) => sum + (dd.recoveryDays || 0), 0) / completedDrawdowns.length 
+    : 0;
+
+  return {
+    maxDrawdown,
+    allDrawdowns: drawdowns,
+    averageDrawdown: Number(averageDrawdown.toFixed(2)),
+    averageRecoveryTime: Number(averageRecoveryTime.toFixed(0)),
+    currentDrawdown: currentDrawdown,
+  };
+}
+
+function createDrawdownPeriod(
+  startDate: string,
+  endDate: string,
+  recoveryDate: string | undefined,
+  peakValue: number,
+  troughValue: number,
+  drawdownPercent: number
+): DrawdownPeriod {
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  const durationDays = Math.ceil((end.getTime() - start.getTime()) / (24 * 60 * 60 * 1000));
+  
+  let recoveryDays: number | undefined;
+  if (recoveryDate) {
+    const recovery = new Date(recoveryDate);
+    recoveryDays = Math.ceil((recovery.getTime() - end.getTime()) / (24 * 60 * 60 * 1000));
+  }
+
+  return {
+    startDate,
+    endDate,
+    recoveryDate,
+    peakValue,
+    troughValue,
+    drawdownPercent: Number(drawdownPercent.toFixed(2)),
+    durationDays,
+    recoveryDays,
   };
 }

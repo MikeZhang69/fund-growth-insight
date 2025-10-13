@@ -8,6 +8,8 @@ import { InvestmentAnalysis } from "@/components/InvestmentAnalysis";
 import { InvestmentBehaviorAnalysis } from "@/components/InvestmentBehaviorAnalysis";
 import { FileUpload } from "@/components/FileUpload";
 import { RiskMetricsCard } from "@/components/RiskMetricsCard";
+import { BenchmarkComparisonCard } from "@/components/BenchmarkComparisonCard";
+import { DrawdownAnalysisCard } from "@/components/DrawdownAnalysisCard";
 import {
   parseCSV,
   parseCSVWithValidation,
@@ -15,6 +17,8 @@ import {
   calculateAnnualReturns,
   calculateOverallMetrics,
   calculateRiskMetrics,
+  calculateBenchmarkComparisons,
+  calculateDrawdownAnalysis,
   PortfolioData,
   RiskMetrics,
 } from "@/utils/portfolioAnalysis";
@@ -79,6 +83,8 @@ const Index = () => {
   const correlations = calculateCorrelations(data);
   const annualReturns = calculateAnnualReturns(data);
   const riskMetrics = calculateRiskMetrics(data);
+  const benchmarkComparisons = calculateBenchmarkComparisons(data);
+  const drawdownAnalysis = calculateDrawdownAnalysis(data);
 
   if (!metrics) return null;
 
@@ -129,6 +135,11 @@ const Index = () => {
             totalReturn={metrics.totalReturn}
             correlations={correlations}
           />
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-1 lg:grid-cols-2">
+          <BenchmarkComparisonCard comparisons={benchmarkComparisons} />
+          <DrawdownAnalysisCard drawdownAnalysis={drawdownAnalysis} />
         </div>
 
         <InvestmentBehaviorAnalysis data={data} />
