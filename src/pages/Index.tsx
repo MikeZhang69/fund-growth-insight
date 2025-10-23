@@ -8,6 +8,7 @@ import { InvestmentAnalysis } from "@/components/InvestmentAnalysis";
 import { InvestmentBehaviorAnalysis } from "@/components/InvestmentBehaviorAnalysis";
 import { FileUpload } from "@/components/FileUpload";
 import { RiskMetricsCard } from "@/components/RiskMetricsCard";
+import { MarketIndicesExport } from "@/components/MarketIndicesExport";
 import { BenchmarkComparisonCard } from "@/components/BenchmarkComparisonCard";
 import { DrawdownAnalysisCard } from "@/components/DrawdownAnalysisCard";
 import {
@@ -143,6 +144,8 @@ const Index = () => {
         </div>
 
         <InvestmentBehaviorAnalysis data={data} />
+
+        <MarketIndicesExport className="mb-8" />
 
         <AnnualReturnsTable returns={annualReturns} />
       </div>
