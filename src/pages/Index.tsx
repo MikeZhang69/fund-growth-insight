@@ -32,7 +32,7 @@ const Index = () => {
   useEffect(() => {
     const loadDefaultData = async () => {
       try {
-        const response = await fetch("/PORTFOLIO_SNAPSHOT.csv");
+        const response = await fetch(`${import.meta.env.BASE_URL}PORTFOLIO_SNAPSHOT.csv`);
         const csvText = await response.text();
         const parsedData = parseCSV(csvText);
         setData(parsedData);

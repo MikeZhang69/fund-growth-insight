@@ -183,7 +183,7 @@
   */
  export const processDefaultPortfolioSnapshot = async (): Promise<string> => {
    try {
-     const response = await fetch('/PORTFOLIO_SNAPSHOT.csv');
+     const response = await fetch(`${import.meta.env.BASE_URL}PORTFOLIO_SNAPSHOT.csv`);
      if (!response.ok) {
        throw new Error(`Failed to fetch portfolio snapshot: ${response.statusText}`);
      }
